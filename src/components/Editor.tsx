@@ -19,22 +19,31 @@ export default function Editor() {
     // Bind Quill with Yjs
     new QuillBinding(yText, quill);
 
+    socket.on("connect", () => {
+      console.log("✅ Socket connected:", socket.id);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err);
+    });
+
     const stateVector = Y.encodeStateVector(yDoc);
     socket.emit("join-document", {docId , stateVector});
 
     // send event to load the document
-    socket.on("load-document", (update: Uint8Array) => {
-      Y.applyUpdate(yDoc, update);
+    socket.on("load-document", (update: number[]) => {
+      Y.applyUpdate(yDoc, new Uint8Array(update), "remote");
       // setValue(yText.toString());
     });
 
     // send events to receive the update
-    socket.on("receive-update", (update: Uint8Array) => {
-      Y.applyUpdate(yDoc, update);
+    socket.on("receive-update", (update: number[]) => {
+      Y.applyUpdate(yDoc, new Uint8Array(update), "remote");
     });
 
-    yDoc.on("update", (update: Uint8Array) => {
-      socket.emit("send-update", update);
+    yDoc.on("update", (update: Uint8Array, origin: any) => {
+      if (origin === "remote") return;
+      socket.emit("send-update", Array.from(update));
     });
 
     // yText.observe(() => {
@@ -51,7 +60,7 @@ export default function Editor() {
   //   const newValue = e.target.value;
 
   //   // Replace content (temporary approach)
-  //   yDoc.transact(() => {
+  //   yDoc.transact(() => {```
   //     yText.delete(0, yText.length);
   //     yText.insert(0, newValue);
   //   });
