@@ -8,3 +8,16 @@ export interface DocumentState {
     snapshotPromise: Promise<Uint8Array> | null;
     isDirty: boolean;
 }
+
+export interface CursorPosition {
+    index: number;
+    length: number;
+}
+
+export interface PresenceState {
+    userId: string;
+    displayName: string;
+    cursor: CursorPosition
+    color: string;
+    lastSeen: number;
+}

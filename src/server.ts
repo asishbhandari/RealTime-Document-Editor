@@ -7,6 +7,8 @@ import * as Y from "yjs";
 import { getYDoc, documents } from "./store/documentStore.js"
 import { DocumentState } from "./types/documents.js";
 import { pubClient, subClient} from "./redis.js"
+import { presenceMap } from "./store/presenceStore.js";
+import { getUSerColor } from "./utilites/helperFunctions.js";
 
 dotenv.config();
 
@@ -104,6 +106,38 @@ io.on("connection", (socket: Socket)=> {
                 console.error("Invalid update", err);
             }
         });
+
+        socket.on("cursor-update", ({index, length} : {index: number, length: number}) => {
+            if(!docId) return;
+
+            let docPresence = presenceMap.get(docId);
+
+            if(!docPresence){
+                docPresence = new Map();
+                presenceMap.set(docId, docPresence);
+            }
+
+            docPresence.set(socket.id, {
+                userId: socket.id,
+                displayName: socket.id.slice(0,6),
+                color: getUSerColor(socket.id),
+                cursor: {
+                    index,
+                    length
+                },
+                lastSeen: Date.now()
+            });
+
+            socket.to(docId).emit("presence-updated", {
+                userId: socket.id,
+                displayName: socket.id.slice(0,6),
+                color: getUSerColor(socket.id),
+                cursor: {
+                    index,
+                    length
+                },
+            })
+        })
         
         socket.on("disconnect", ()=>{
             doc.users.delete(socket.id)
