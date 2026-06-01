@@ -4,11 +4,23 @@ import { yDoc, yText } from "../yjs/yjsClient";
 import Quill from "quill";
 import { QuillBinding } from "y-quill";
 import * as Y from "yjs";
+import throttle from "lodash/throttle";
 
 const docId = "doc1";
 
 export default function Editor() {
-  const editorRef= useRef<HTMLDivElement | null>(null)
+  const editorRef= useRef<HTMLDivElement | null>(null);
+  const remoteUsers =  useRef(new Map());
+
+  const emitCursorUpdate = throttle(
+    (range) => {
+      socket.emit("cursor-update", {
+        index: range.index,
+        length: range.length
+      });
+    },
+    50
+  );
 
   useEffect(() => {
     // send event to join the doc
@@ -18,6 +30,11 @@ export default function Editor() {
     });
     // Bind Quill with Yjs
     new QuillBinding(yText, quill);
+
+    quill.on("selection-change", (range)=>{
+      if(!range) return;
+      emitCursorUpdate(range);
+    })
 
     socket.on("connect", () => {
       console.log("✅ Socket connected:", socket.id);
@@ -41,10 +58,15 @@ export default function Editor() {
       Y.applyUpdate(yDoc, new Uint8Array(update), "remote");
     });
 
-    yDoc.on("update", (update: Uint8Array, origin: any) => {
+    yDoc.on("update", (update: Uint8Array, origin: string) => {
       if (origin === "remote") return;
       socket.emit("send-update", Array.from(update));
     });
+
+    socket.on("presence-updated", (presence)=>{
+      remoteUsers.current.set(presence.userId, presence );
+      console.log("Remote Presence: ",presence)
+    })
 
     // yText.observe(() => {
     //   setValue(yText.toString());
