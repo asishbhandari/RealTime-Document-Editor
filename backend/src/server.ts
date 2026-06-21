@@ -6,7 +6,7 @@ import http from "http";
 import * as Y from "yjs";
 import { getYDoc, documents } from "./store/documentStore.js"
 import { DocumentState } from "./types/documents.js";
-import { pubClient, subClient} from "./redis.js"
+import { pubClient, subClient, connectRedis} from "./redis.js"
 import { presenceMap } from "./store/presenceStore.js";
 import { getUSerColor } from "./utilites/helperFunctions.js";
 
@@ -87,7 +87,7 @@ io.on("connection", (socket: Socket)=> {
         socket.emit("load-document", Array.from(update));
 
         // listen for updates from client
-        socket.on("send-update", (update: number[]) => {
+        socket.on("send-update", async(update: number[]) => {
             if(!doc || !docId) return;
             try {
                 const Uint8Update= new Uint8Array(update)
@@ -97,7 +97,7 @@ io.on("connection", (socket: Socket)=> {
                 socket.to(docId).emit("receive-update", Array.from(Uint8Update));
 
                 // Publish to redis
-                pubClient.publish(CHANNEL, JSON.stringify({
+                await pubClient.publish(CHANNEL, JSON.stringify({
                     docId: docId,
                     update: Array.from(Uint8Update),
                     source: SERVER_ID,
@@ -161,6 +161,7 @@ subClient.subscribe(CHANNEL, (message)=>{
     io.to(docId).emit("receive-update", new Uint8Array(update));
 })
 
+await connectRedis();
 const PORT = process.env.PORT || 3003
 httpServer.listen(PORT, ()=> {
     console.log("===========> Server is running on PORT: ",PORT)
