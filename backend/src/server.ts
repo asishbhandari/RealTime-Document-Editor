@@ -9,6 +9,9 @@ import { DocumentState } from "./types/documents.js";
 import { pubClient, subClient, connectRedis} from "./redis.js"
 import { presenceMap } from "./store/presenceStore.js";
 import { getUSerColor } from "./utilites/helperFunctions.js";
+import { SERVER_ID } from "./constants/server.js";
+import { subscribeToDocument } from "./services/redisSubscriptions.js";
+import { registerCursorHandler, registerDisconnectHandler, registerUpdateHandler } from "./services/socketHandlers.js";
 
 dotenv.config();
 
@@ -17,7 +20,6 @@ app.use(cors());
 
 const httpServer= http.createServer(app);
 const CHANNEL= "doc-updates";
-const SERVER_ID = Math.random().toString();
 
 async function getSnapshot(doc: DocumentState): Promise<Uint8Array> {
   if (doc.snapshotCache && !doc.isDirty) {
@@ -65,13 +67,16 @@ io.on("connection", (socket: Socket)=> {
     console.log("user Connected: ",socket.id);
 
     socket.on("join-document", async({ docId, stateVector,}:{docId: string, stateVector: Uint8Array})=> {
-        const doc= getYDoc(docId)
+        const doc= getYDoc(docId);
         socket.join(docId);
+        
+        socket.data.docId = docId;
+        socket.data.doc = doc;
+
         doc.users.add(socket.id)
+        await subscribeToDocument(docId, io);
 
         // send current state to client
-        // const state= Y.encodeStateAsUpdate(doc.yDoc)
-        // socket.emit("load-document", state);
         let update: Uint8Array;
         if (!stateVector || stateVector.length === 0) {
             // New user → send snapshot
@@ -81,87 +86,95 @@ io.on("connection", (socket: Socket)=> {
             update = Y.encodeStateAsUpdate(doc.yDoc, stateVector);
         }
         
-        // getSnapshot(doc).then((snapshot) => {
-        //     socket.emit("load-document", snapshot);
-        // });
         socket.emit("load-document", Array.from(update));
 
+        console.log(`[${SERVER_ID}] ${socket.id} joined ${docId}`);
+
         // listen for updates from client
-        socket.on("send-update", async(update: number[]) => {
-            if(!doc || !docId) return;
-            try {
-                const Uint8Update= new Uint8Array(update)
-                Y.applyUpdate(doc.yDoc, Uint8Update);
-                doc.isDirty = true;
+        // socket.on("send-update", async(update: number[]) => {
+        //     if(!doc || !docId) return;
+        //     try {
+        //         const Uint8Update= new Uint8Array(update)
+        //         Y.applyUpdate(doc.yDoc, Uint8Update);
+        //         doc.isDirty = true;
 
-                socket.to(docId).emit("receive-update", Array.from(Uint8Update));
+        //         socket.to(docId).emit("receive-update", Array.from(Uint8Update));
 
-                // Publish to redis
-                await pubClient.publish(CHANNEL, JSON.stringify({
-                    docId: docId,
-                    update: Array.from(Uint8Update),
-                    source: SERVER_ID,
-                }))
-            } catch (err) {
-                console.error("Invalid update", err);
-            }
-        });
+        //         // Publish to redis
+        //         console.log(`[${SERVER_ID}] Published update for doc:${docId}`);
+        //         await pubClient.publish(`doc:${docId}`, JSON.stringify({
+        //             docId: docId,
+        //             update: Array.from(Uint8Update),
+        //             source: SERVER_ID,
+        //         }))
+        //     } catch (err) {
+        //         console.error("Invalid update", err);
+        //     }
+        // });
 
-        socket.on("cursor-update", ({index, length} : {index: number, length: number}) => {
-            if(!docId) return;
+        // socket.on("cursor-update", ({index, length} : {index: number, length: number}) => {
+        //     if(!docId) return;
 
-            let docPresence = presenceMap.get(docId);
+        //     let docPresence = presenceMap.get(docId);
 
-            if(!docPresence){
-                docPresence = new Map();
-                presenceMap.set(docId, docPresence);
-            }
+        //     if(!docPresence){
+        //         docPresence = new Map();
+        //         presenceMap.set(docId, docPresence);
+        //     }
 
-            docPresence.set(socket.id, {
-                userId: socket.id,
-                displayName: socket.id.slice(0,6),
-                color: getUSerColor(socket.id),
-                cursor: {
-                    index,
-                    length
-                },
-                lastSeen: Date.now()
-            });
+        //     docPresence.set(socket.id, {
+        //         userId: socket.id,
+        //         displayName: socket.id.slice(0,6),
+        //         color: getUSerColor(socket.id),
+        //         cursor: {
+        //             index,
+        //             length
+        //         },
+        //         lastSeen: Date.now()
+        //     });
 
-            socket.to(docId).emit("presence-updated", {
-                userId: socket.id,
-                displayName: socket.id.slice(0,6),
-                color: getUSerColor(socket.id),
-                cursor: {
-                    index,
-                    length
-                },
-            })
-        })
+        //     socket.to(docId).emit("presence-updated", {
+        //         userId: socket.id,
+        //         displayName: socket.id.slice(0,6),
+        //         color: getUSerColor(socket.id),
+        //         cursor: {
+        //             index,
+        //             length
+        //         },
+        //     })
+        // })
         
-        socket.on("disconnect", ()=>{
-            doc.users.delete(socket.id)
-        });
+        // socket.on("disconnect", ()=>{
+        //     doc.users.delete(socket.id)
+        // });
     });
 
-    socket.on("disconnect",()=>{
-        console.log("User disconnected: ",socket.id);
-    })
+    registerUpdateHandler(socket);
+    registerCursorHandler(socket);
+    registerDisconnectHandler(socket);
+
+    // socket.on("disconnect",()=>{
+    //     console.log("User disconnected: ",socket.id);
+    // })
 });
 
-subClient.subscribe(CHANNEL, (message)=>{
-    const { docId, update, source } = JSON.parse(message);
-    // Ignore self messages
-    if (source === SERVER_ID) return;
-
-    const doc = getYDoc(docId);
-
-    Y.applyUpdate(doc.yDoc, new Uint8Array(update));
-    // Broadcast to local clients
-    io.to(docId).emit("receive-update", new Uint8Array(update));
-})
 
 await connectRedis();
+// subClient.subscribe(CHANNEL, (message)=>{
+//     const { docId, update, source } = JSON.parse(message);
+//     // Ignore self messages
+//     console.log(`[${SERVER_ID}] Received Redis update for ${docId}`);
+//     if (source === SERVER_ID) return;
+
+//     // const doc = getYDoc(docId);
+//     const doc = documents[docId];
+//     if(!doc) return;
+
+//     Y.applyUpdate(doc.yDoc, new Uint8Array(update));
+//     // Broadcast to local clients
+//     io.to(docId).emit("receive-update", new Uint8Array(update));
+// })
+
 const PORT = process.env.PORT || 3003
 httpServer.listen(PORT, ()=> {
     console.log("===========> Server is running on PORT: ",PORT)

@@ -7,6 +7,14 @@ export const pubClient= createClient({
 });
 export const subClient= pubClient.duplicate();
 
+subClient.on("error", (err) => {
+  console.error("Redis Subscriber Error:", err);
+});
+
+pubClient.on("error", (err) => {
+  console.error("Redis Publisher Error:", err);
+});
+
 export async function connectRedis() {
   try {
     await pubClient.connect();

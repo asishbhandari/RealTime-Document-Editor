@@ -38,14 +38,13 @@ export default function Editor() {
 
     socket.on("connect", () => {
       console.log("✅ Socket connected:", socket.id);
+      const stateVector = Y.encodeStateVector(yDoc);
+      socket.emit("join-document", {docId , stateVector});
     });
 
     socket.on("connect_error", (err) => {
       console.error("❌ Socket connection error:", err);
     });
-
-    const stateVector = Y.encodeStateVector(yDoc);
-    socket.emit("join-document", {docId , stateVector});
 
     // send event to load the document
     socket.on("load-document", (update: number[]) => {
@@ -55,10 +54,12 @@ export default function Editor() {
 
     // send events to receive the update
     socket.on("receive-update", (update: number[]) => {
+      console.log("Receive update", update.length);
       Y.applyUpdate(yDoc, new Uint8Array(update), "remote");
     });
 
     yDoc.on("update", (update: Uint8Array, origin: string) => {
+      console.log("Current text:", yText.toString());
       if (origin === "remote") return;
       socket.emit("send-update", Array.from(update));
     });
