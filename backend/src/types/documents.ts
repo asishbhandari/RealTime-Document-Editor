@@ -7,6 +7,8 @@ export interface DocumentState {
     snapshotCache: Uint8Array | null;
     snapshotPromise: Promise<Uint8Array> | null;
     isDirty: boolean;
+
+    lastUserLeftAt?: number;
 }
 
 export interface CursorPosition {

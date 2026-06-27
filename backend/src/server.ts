@@ -12,6 +12,8 @@ import { getUSerColor } from "./utilites/helperFunctions.js";
 import { SERVER_ID } from "./constants/server.js";
 import { subscribeToDocument } from "./services/redisSubscriptions.js";
 import { registerCursorHandler, registerDisconnectHandler, registerUpdateHandler } from "./services/socketHandlers.js";
+import { startBatchPublisher } from "./services/batchPublisher.js";
+import { startDocumentEviction } from "./services/documentEviction.js";
 
 dotenv.config();
 
@@ -57,12 +59,10 @@ setInterval(() => {
     }
   });
 }, 5000);
-
 app.get("/api/health/check", (req, res)=> {
     console.log("=====> Health Check Triggered");
     return res.status(200).send({status: "Healthy"})
 })
-
 io.on("connection", (socket: Socket)=> {
     console.log("user Connected: ",socket.id);
 
@@ -74,6 +74,7 @@ io.on("connection", (socket: Socket)=> {
         socket.data.doc = doc;
 
         doc.users.add(socket.id)
+        doc.lastUserLeftAt = undefined;
         await subscribeToDocument(docId, io);
 
         // send current state to client
@@ -160,6 +161,8 @@ io.on("connection", (socket: Socket)=> {
 
 
 await connectRedis();
+startBatchPublisher();
+startDocumentEviction();
 // subClient.subscribe(CHANNEL, (message)=>{
 //     const { docId, update, source } = JSON.parse(message);
 //     // Ignore self messages
@@ -177,5 +180,5 @@ await connectRedis();
 
 const PORT = process.env.PORT || 3003
 httpServer.listen(PORT, ()=> {
-    console.log("===========> Server is running on PORT: ",PORT)
+    console.log("===========> Server v2 is running on PORT: ",PORT)
 })

@@ -4,6 +4,7 @@ import { pubClient } from "../redis.js";
 import { SERVER_ID } from "../constants/server.js";
 import { presenceMap } from "../store/presenceStore.js";
 import { getUSerColor } from "../utilites/helperFunctions.js";
+import { updateQueue } from "../store/updateQueue.js";
 
 export function registerUpdateHandler(socket: DocumentSocket) {
   socket.on("send-update", async (update: number[]) => {
@@ -23,17 +24,24 @@ export function registerUpdateHandler(socket: DocumentSocket) {
         .to(docId)
         .emit("receive-update", Array.from(uint8Update));
 
-      await pubClient.publish(
-        `doc:${docId}`,
-        JSON.stringify({
-          docId,
-          update: Array.from(uint8Update),
-          source: SERVER_ID,
-        })
-      );
+      // await pubClient.publish(
+      //   `doc:${docId}`,
+      //   JSON.stringify({
+      //     docId,
+      //     update: Array.from(uint8Update),
+      //     source: SERVER_ID,
+      //   })
+      // );
+
+      let queue = updateQueue.get(docId);
+      if(!queue){
+        queue = [];
+        updateQueue.set(docId, queue);
+      }
+      queue.push(uint8Update);
 
       console.log(
-        `[${SERVER_ID}] Published update for doc:${docId}`
+        `[${SERVER_ID}] Queued update for doc:${docId}`
       );
     } catch (err) {
       console.error("Invalid update", err);
@@ -89,6 +97,9 @@ export function registerDisconnectHandler(socket: DocumentSocket) {
     
     if (doc) {
       doc.users.delete(socket.id);
+      if (doc.users.size === 0) {
+        doc.lastUserLeftAt = Date.now();
+      }
     }
 
     const presence = presenceMap.get(docId);

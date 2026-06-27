@@ -7,6 +7,10 @@ services:
       - "3003:3003"
     environment:
       REDIS_URL: redis://redis:6379
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
   backend2:
     build:
       context: ./backend
@@ -14,7 +18,24 @@ services:
     ports:
       - "3004:3003"
     environment:
-      - REDIS_URL= redis://redis:6379
+      REDIS_URL: redis://redis:6379
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    depends_on:
+      - backend1
   redis: 
     image: redis:latest
     container_name: redis-server-comp
