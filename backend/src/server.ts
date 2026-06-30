@@ -14,6 +14,7 @@ import { subscribeToDocument } from "./services/redisSubscriptions.js";
 import { registerCursorHandler, registerDisconnectHandler, registerUpdateHandler } from "./services/socketHandlers.js";
 import { startBatchPublisher } from "./services/batchPublisher.js";
 import { startDocumentEviction } from "./services/documentEviction.js";
+import { rateLimiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 
@@ -59,7 +60,7 @@ setInterval(() => {
     }
   });
 }, 5000);
-app.get("/api/health/check", (req, res)=> {
+app.get("/api/health/check", rateLimiter, (req, res)=> {
     console.log("=====> Health Check Triggered");
     return res.status(200).send({status: "Healthy"})
 })
