@@ -8,6 +8,7 @@ import { SERVER_ID } from "../constants/server.js";
 
 export function registerJoinHandler(socket: DocumentSocket, io: Server){
     socket.on("join-document", async({docId, stateVector}:{docId: string, stateVector: Uint8Array})=>{
+        console.log(`Socket JOin-document event received for ${docId}, user: ${socket.id}`)
         const doc=getYDoc(docId);
         socket.join(docId);
 
@@ -17,7 +18,7 @@ export function registerJoinHandler(socket: DocumentSocket, io: Server){
         doc.users.add(socket.id);
         doc.lastUserLeftAt = undefined;
 
-        await subscribeToDocument(docId, io);
+        await subscribeToDocument(docId, io, socket);
 
         // send current state to client
         let update: Uint8Array;

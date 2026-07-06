@@ -25,6 +25,10 @@ export default function Editor() {
   useEffect(() => {
     // send event to join the doc
     if (!editorRef.current) return;
+    const joinDocument=()=>{
+      console.log("Joining document");
+      socket.emit("join-document", { docId, stateVector: Y.encodeStateVector(yDoc)})
+    }
     const quill = new Quill(editorRef.current!, {
       theme: "snow",
     });
@@ -35,12 +39,15 @@ export default function Editor() {
       if(!range) return;
       emitCursorUpdate(range);
     })
-
-    socket.on("connect", () => {
-      console.log("✅ Socket connected:", socket.id);
-      const stateVector = Y.encodeStateVector(yDoc);
-      socket.emit("join-document", {docId , stateVector});
-    });
+    if(socket.connected){
+      joinDocument();
+    }
+    socket.once("connect",joinDocument)
+    // socket.on("connect", () => {
+    //   console.log("✅ Socket connected:", socket.id);
+    //   const stateVector = Y.encodeStateVector(yDoc);
+    //   socket.emit("join-document", {docId , stateVector});
+    // });
 
     socket.on("connect_error", (err) => {
       console.error("❌ Socket connection error:", err);
@@ -48,6 +55,7 @@ export default function Editor() {
 
     // send event to load the document
     socket.on("load-document", (update: number[]) => {
+      console.log("Socket Document loaded event")
       Y.applyUpdate(yDoc, new Uint8Array(update), "remote");
       // setValue(yText.toString());
     });
@@ -74,8 +82,11 @@ export default function Editor() {
     // });
 
     return () => {
+      socket.off("connect");
+      socket.off("connect_error");
       socket.off("load-document");
       socket.off("receive-update");
+      socket.off("presence-updated");
     };
   }, []);
 
@@ -90,11 +101,6 @@ export default function Editor() {
   // };
 
   return (
-    // <textarea
-    //   value={value}
-    //   onChange={handleChange}
-    //   style={{ width: "100%", height: "300px" }}
-    // />
     <div ref={editorRef} style={{ height: "400px" }} />
   );
 }

@@ -4,8 +4,9 @@ import { documents } from "../store/documentStore.js";
 import { subscribedDocs } from "../store/subscriptionStore.js";
 import { SERVER_ID } from "../constants/server.js";
 import { Server } from "socket.io";
+import { DocumentSocket } from "../types/socket.js";
 
-export async function subscribeToDocument(docId: string, io: Server) {
+export async function subscribeToDocument(docId: string, io: Server, socket: DocumentSocket) {
   if (subscribedDocs.has(docId)) {
     return;
   }
@@ -29,7 +30,7 @@ export async function subscribeToDocument(docId: string, io: Server) {
 
   subscribedDocs.add(docId);
 
-  console.log(`Subscribed to doc:${docId}`);
+  console.log(`User: ${socket.id} --> Subscribed to doc:${docId}`);
 }
 
 export async function unsubscribeFromDocument(docId: string) {

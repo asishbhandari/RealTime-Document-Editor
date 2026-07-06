@@ -8,6 +8,7 @@ import { updateQueue } from "../store/updateQueue.js";
 
 export function registerUpdateHandler(socket: DocumentSocket) {
   socket.on("send-update", async (update: number[]) => {
+    console.log(`Socket send-update event received in backend by user: ${socket.id} for document: ${socket.data.docId}`)
     const docId = socket.data.docId;
     const doc = socket.data.doc;
 
@@ -20,9 +21,7 @@ export function registerUpdateHandler(socket: DocumentSocket) {
 
       doc.isDirty = true;
 
-      socket
-        .to(docId)
-        .emit("receive-update", Array.from(uint8Update));
+      socket.to(docId).emit("receive-update", Array.from(uint8Update));
 
       // await pubClient.publish(
       //   `doc:${docId}`,
@@ -54,7 +53,7 @@ export function registerCursorHandler(socket: DocumentSocket) {
     "cursor-update",
     ({ index, length }: { index: number; length: number }) => {
       const docId = socket.data.docId;
-
+      console.log(`Socket cursor-update event received in backend by user: ${socket.id} for document: ${socket.data.docId}`)
       if (!docId) return;
 
       let docPresence = presenceMap.get(docId);

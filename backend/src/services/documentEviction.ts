@@ -1,8 +1,8 @@
 import { documents } from "../store/documentStore.js";
 import { unsubscribeFromDocument } from "./redisSubscriptions.js";
 
-// const EVICTION_TIME = 5 * 60 * 1000;
-const EVICTION_TIME = 15000;
+const EVICTION_TIME = 5 * 60 * 1000;
+// const EVICTION_TIME = 15000;
 
 export function startDocumentEviction(){
     setInterval(async ()=>{
