@@ -7,10 +7,15 @@ services:
       - "3003:3003"
     environment:
       REDIS_URL: redis://redis:6379
+      MONGO_URI: mongodb://mongo:27017/rtdoceditor
+      BCRYPT_SALT_ROUNDS: 12
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./backend:/app
       - /app/node_modules
+    depends_on:
+      - redis
+      - mongo
   backend2:
     build:
       context: ./backend
@@ -19,10 +24,15 @@ services:
       - "3004:3003"
     environment:
       REDIS_URL: redis://redis:6379
+      MONGO_URI: mongodb://mongo:27017/rtdoceditor
+      BCRYPT_SALT_ROUNDS: 12
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./backend:/app
       - /app/node_modules
+    depends_on:
+      - redis
+      - mongo
   frontend:
     build:
       context: ./frontend
@@ -41,3 +51,14 @@ services:
     container_name: redis-server-comp
     ports: 
       - "6379:6379"
+
+  mongo:
+    image: mongo:8
+    container_name: mongo-server
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db 
+
+volumes:
+  mongo-data:

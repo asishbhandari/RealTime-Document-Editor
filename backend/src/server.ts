@@ -19,13 +19,20 @@ import healthRoutes from "./routes/healthRoutes.js"
 import { startSnapshotWorker } from "./background/snapshotWorker.js";
 import { getSnapshot } from "./services/documentSnapshotService.js";
 import { registerSocket } from "./sockets/registerSocket.js";
+import { connectMongo } from "./database/mongo.js";
+import { env } from "./config/env.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import authRouter from "./routes/authRoutes.js";
 
 dotenv.config();
 
 const app= express();
 app.use(cors());
-
+app.use(express.json())
 app.use("/api/health", healthRoutes);
+app.use("/api/auth",authRouter)
+
+app.use(errorHandler);
 
 const httpServer= http.createServer(app);
 const CHANNEL= "doc-updates";
@@ -40,11 +47,12 @@ const io= new Server(httpServer, {
 registerSocket(io)
 
 await connectRedis();
+await connectMongo();
 startSnapshotWorker();
 startBatchPublisher();
 startDocumentEviction();
 
-const PORT = process.env.PORT || 3003
+const PORT = env.PORT || 3003
 httpServer.listen(PORT, ()=> {
     console.log("===========> Server v2 is running on PORT: ",PORT)
 })
