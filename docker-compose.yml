@@ -2,12 +2,15 @@ services:
   backend1: 
     build:
       context: ./backend
+    command: sh -c "npm ci && npm run dev"
     container_name: backend-1
     ports:
       - "3003:3003"
     environment:
       REDIS_URL: redis://redis:6379
       MONGO_URI: mongodb://mongo:27017/rtdoceditor
+      JWT_SECRET: asish12345asish
+      JWT_REFRESH_SECRET: asish12345asish1235
       BCRYPT_SALT_ROUNDS: 12
       CHOKIDAR_USEPOLLING: "true"
     volumes:
@@ -19,12 +22,15 @@ services:
   backend2:
     build:
       context: ./backend
+    command: sh -c "npm ci && npm run dev"
     container_name: backend-2
     ports:
       - "3004:3003"
     environment:
       REDIS_URL: redis://redis:6379
       MONGO_URI: mongodb://mongo:27017/rtdoceditor
+      JWT_SECRET: asish12345asish
+      JWT_REFRESH_SECRET: asish12345asish1235
       BCRYPT_SALT_ROUNDS: 12
       CHOKIDAR_USEPOLLING: "true"
     volumes:
